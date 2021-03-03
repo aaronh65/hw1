@@ -11,8 +11,9 @@ import xml.etree.ElementTree as ET
 
 import torch
 import torch.nn
-from PIL import Image
 from torch.utils.data import Dataset
+from torchvision import transforms
+from PIL import Image
 
 
 class VOCDataset(Dataset):
@@ -37,6 +38,11 @@ class VOCDataset(Dataset):
             self.index_list = [line.strip() for line in fp]
 
         self.anno_list = self.preload_anno()
+        self.transform = transforms.Compose(
+            [transforms.RandomHorizontalFlip(p=0.5),
+             transforms.Resize((self.size,self.size)),
+             transforms.ToTensor(),
+             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))])
 
     @classmethod
     def get_class_name(cls, index):
@@ -48,6 +54,24 @@ class VOCDataset(Dataset):
 
     def __len__(self):
         return len(self.index_list)
+    
+    def get_labels_and_weights(self, index):
+        fpath = os.path.join(self.ann_dir, index + '.xml')
+        tree = ET.parse(fpath)
+        root = tree.getroot()
+        labels = np.zeros(20)
+        weights = np.ones(20)
+        name = None
+        for child in root:
+            if child.tag != 'object':
+                continue
+            for attr in child:
+                if attr.tag == 'name':
+                    name = attr.text
+                    labels[self.INV_CLASS[name]] = 1
+                if attr.tag == 'difficult' and attr.text == '1':
+                    weights[self.INV_CLASS[name]] = 1
+        return [labels, weights]
 
     def preload_anno(self):
         """
@@ -56,10 +80,7 @@ class VOCDataset(Dataset):
         """
         label_list = []
         for index in self.index_list:
-            fpath = os.path.join(self.ann_dir, index + '.xml')
-            tree = ET.parse(fpath)
-            # TODO: insert your code here, preload labels
-
+            label_list.append(self.get_labels_and_weights(index))
         return label_list
 
     def __getitem__(self, index):
@@ -71,10 +92,15 @@ class VOCDataset(Dataset):
         weight: FloatTensor in shape of (Nc, ) difficult or not.
         """
         findex = self.index_list[index]
+        label, wgt = self.get_labels_and_weights(findex)
         fpath = os.path.join(self.img_dir, findex + '.jpg')
         # TODO: insert your code here. hint: read image, find the labels and weight.
-
-        image = torch.FloatTensor(img)
-        label = torch.FloatTensor(lab_vec)
-        wgt = torch.FloatTensor(wgt_vec)
+        img = Image.open(fpath)
+        #img = np.array(Image.open(fpath))
+        #img = img - np.array([[[123.68, 116.78, 103.94]]])
+        #img = Image.fromarray(img.astype(np.uint8))
+        
+        image = self.transform(img)
+        label = torch.FloatTensor(label)
+        wgt = torch.FloatTensor(wgt)
         return image, label, wgt

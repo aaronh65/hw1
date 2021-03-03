@@ -8,6 +8,7 @@ import torch
 import numpy as np
 import sklearn.metrics
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 
 class ARGS(object):
@@ -48,7 +49,9 @@ class ARGS(object):
     # set this to value >0 if you wish to save every x epochs
     save_freq=-1
     # set true if using GPU during training
-    use_cuda = False
+    use_cuda = True
+    # image size
+    size = 64
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -68,10 +71,13 @@ class ARGS(object):
         return torch.device("cuda" if self.use_cuda else "cpu")
 
 
-def get_data_loader(name='voc', train=True, batch_size=64, split='train'):
+def get_data_loader(name='voc', train=True, batch_size=64, split='train', args=None):
+    
     if name == 'voc':
         from voc_dataset import VOCDataset
-        dataset = VOCDataset(split, 64)
+        size = 64 if args is None else args.size
+        data_dir = '../data/VOCdevkit/VOC2007/'
+        dataset = VOCDataset(split, size, data_dir)
     else:
         raise NotImplementedError
 
@@ -121,12 +127,30 @@ def eval_dataset_map(model, device, test_loader):
          AP (list): Average Precision for all classes
          MAP (float): mean average precision
     """
+    N = len(test_loader)
+    
+    gt = None
+    pred = None
+    valid = None
     with torch.no_grad():
+        i = 0
         for data, target, wgt in test_loader:
             ## TODO insert your code here
-            gt, pred, valid = None, None, None
-            pass
+            data = data.to(device)
+            target = target.to(device)
+            wgt = wgt.to(device)
+            batch_size = data.shape[0]
+            if gt is None:
+                gt = np.zeros((N*batch_size, 20))
+                pred = np.zeros((N*batch_size, 20))
+                valid = np.zeros((N*batch_size, 20))
+            start, end = batch_size*i, batch_size*(i+1)
+            output = torch.sigmoid(model(data))
+            gt[start:end] = target.cpu()
+            pred[start:end] = output.cpu()
+            valid[start:end] = wgt.cpu()
+            i += 1
+            
     AP = compute_ap(gt, pred, valid)
-
     mAP = np.mean(AP)
     return AP, mAP

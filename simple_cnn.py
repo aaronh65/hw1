@@ -40,15 +40,16 @@ class SimpleCNN(nn.Module):
         self.conv1 = nn.Conv2d(c_dim, 32, 5, padding=2)
         self.conv2 = nn.Conv2d(32, 64, 5, padding=2)
         # TODO: Modify the code here
-        self.nonlinear = lambda x: x
+        #self.nonlinear = lambda x: x
+        self.nonlinear = nn.ReLU()
         self.pool1 = nn.AvgPool2d(2, 2)
         self.pool2 = nn.AvgPool2d(2, 2)
 
         # TODO: q0.1 Modify the code here
-        self.flat_dim = 1
+        self.flat_dim = int(64*(inp_size/4)**2)
         # chain your layers by Sequential -- another way
         # TODO: Modify the code here
-        self.fc1 = nn.Sequential(*get_fc(self.flat_dim, 128, 'none'))
+        self.fc1 = nn.Sequential(*get_fc(self.flat_dim, 128, 'relu'))
         self.fc2 = nn.Sequential(*get_fc(128, num_classes, 'none'))
 
     def forward(self, x):
@@ -66,7 +67,9 @@ class SimpleCNN(nn.Module):
         x = self.pool2(x)
 
         # TODO: q0.1 hint (you might want to check the dimension of input here)
+        
         flat_x = x.view(N, self.flat_dim)
         out = self.fc1(flat_x)
+        #out = self.nonlinear(out)
         out = self.fc2(out)
         return out
