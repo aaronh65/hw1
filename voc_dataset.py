@@ -38,13 +38,24 @@ class VOCDataset(Dataset):
             self.index_list = [line.strip() for line in fp]
 
         self.anno_list = self.preload_anno()
-        self.transform = transforms.Compose(
+        self.crop_buffer = 10
+        self.train_transform = transforms.Compose(
             [transforms.RandomHorizontalFlip(p=0.5),
-             transforms.Resize((self.size,self.size)),
+             transforms.Resize(self.size + self.crop_buffer),
+             transforms.RandomCrop(self.size),
+             transforms.ColorJitter(0.3,0.3,0.3),
+             #transforms.Resize((self.size,self.size)),
              transforms.ToTensor(),
              #transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
              transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
             ])
+        
+        self.test_transform = transforms.Compose(
+        [transforms.Resize(self.size+self.crop_buffer),
+         transforms.CenterCrop(self.size),
+         transforms.ToTensor(),
+         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ])
 
     @classmethod
     def get_class_name(cls, index):
@@ -103,7 +114,10 @@ class VOCDataset(Dataset):
         #img = img - np.array([[[123.68, 116.78, 103.94]]])
         #img = Image.fromarray(img.astype(np.uint8))
         
-        image = self.transform(img)
+        if self.split == 'trainval':
+            image = self.train_transform(img)
+        else:
+            image = self.test_transform(img)
         label = torch.FloatTensor(label)
         wgt = torch.FloatTensor(wgt)
         return image, label, wgt

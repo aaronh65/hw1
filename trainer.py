@@ -53,6 +53,7 @@ def train(args, model, optimizer, scheduler=None, model_name='model'):
 
     # TODO: Q1.4 Implement model training code!
     cnt = 0
+    criterion = torch.nn.BCELoss()
     for epoch in range(args.epochs):
         for batch_idx, (data, target, wgt) in enumerate(train_loader):
             # Get a batch of data
@@ -61,8 +62,10 @@ def train(args, model, optimizer, scheduler=None, model_name='model'):
             # Forward pass
             output = model(data)
             
+            output = torch.sigmoid(output)
+            target = target * wgt
             # TODO: your loss for multi-label clf?
-            criterion = torch.nn.BCEWithLogitsLoss(wgt)
+            #criterion = torch.nn.BCEWithLogitsLoss(wgt)
             loss = criterion(output, target)
             # Calculate gradient w.r.t the loss
             loss.backward()
