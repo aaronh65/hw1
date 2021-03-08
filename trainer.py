@@ -21,14 +21,31 @@ def save_model(epoch, model_name, model):
     # TODO: Q2 Implement code for model saving
     path = f'{model_name}_{epoch:02d}.pt'
     torch.save(model.state_dict(), path)
+    
+def make_gradient_histograms(step, model, writer):
+    grad_dict = dict()
+    params = model.named_parameters()
+    with torch.no_grad():
+        for i, named_param in enumerate(params):
+            name, param = named_param
+            if 'conv' in name:
+                layer_name = name.split('.')[0]
+                if layer_name not in grad_dict:
+                    grad_dict[layer_name] = []
+                grad_dict[layer_name].append(param.grad.flatten())
+                
+        for name, grad_list in grad_dict.items():
+            grads = torch.cat(grad_list)
+            writer.add_histogram(f'{name}/gradient_histogram', grads, step)
+    return grad_dict
 
 
 def train(args, model, optimizer, scheduler=None, model_name='model'):
     # TODO: Q1.5 Initialize your visualizer here!
     # TODO: Q1.2 complete your dataloader in voc_dataset.py
-    train_loader = utils.get_data_loader('voc', train=True, batch_size=args.batch_size, split='trainval')
-    test_loader = utils.get_data_loader('voc', train=False, batch_size=args.test_batch_size, split='test')
-    writer = SummaryWriter()
+    train_loader = utils.get_data_loader('voc', train=True, batch_size=args.batch_size, split='trainval', args=args)
+    test_loader = utils.get_data_loader('voc', train=False, batch_size=args.test_batch_size, split='test', args=args)
+    writer = SummaryWriter(model_name)
 
     # Ensure model is in correct mode and on right device
     model.train()
@@ -56,21 +73,24 @@ def train(args, model, optimizer, scheduler=None, model_name='model'):
                 # todo: add your visualization code
                 print('Train Epoch: {} [{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, cnt, 100. * batch_idx / len(train_loader), loss.item()))
+                make_gradient_histograms(cnt, model, writer)
             # Validation iteration
             writer.add_scalar('training loss', loss.item(), cnt)
             if cnt % args.val_every == 0:
-                model.eval()
                 ap, map = utils.eval_dataset_map(model, args.device, test_loader)
                 writer.add_scalar('mean average precision', map.item(), cnt)
-                model.train()
             cnt += 1
+        lr = optimizer.param_groups[0]['lr']
+        writer.add_scalar('learning rate', lr, cnt)
         if save_this_epoch(args, epoch):
             save_model(epoch, model_name, model)
-            
         if scheduler is not None:
+            #print('Epoch-{0} lr: {1}'.format(epoch, optimizer.param_groups[0]['lr']))
             scheduler.step()
 
     # Validation iteration
-    test_loader = utils.get_data_loader('voc', train=False, batch_size=args.test_batch_size, split='test')
+    #test_loader = utils.get_data_loader('voc', train=False, batch_size=args.test_batch_size, split='test')
     ap, map = utils.eval_dataset_map(model, args.device, test_loader)
+    if args.save_at_end:
+        save_model(epoch, model_name, model)
     return ap, map

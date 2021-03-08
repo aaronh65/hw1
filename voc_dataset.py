@@ -42,7 +42,9 @@ class VOCDataset(Dataset):
             [transforms.RandomHorizontalFlip(p=0.5),
              transforms.Resize((self.size,self.size)),
              transforms.ToTensor(),
-             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))])
+             #transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+             transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ])
 
     @classmethod
     def get_class_name(cls, index):
@@ -91,6 +93,7 @@ class VOCDataset(Dataset):
         label: LongTensor in shape of (Nc, ) binary label
         weight: FloatTensor in shape of (Nc, ) difficult or not.
         """
+        index = index % len(self.index_list)
         findex = self.index_list[index]
         label, wgt = self.get_labels_and_weights(findex)
         fpath = os.path.join(self.img_dir, findex + '.jpg')

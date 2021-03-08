@@ -45,9 +45,9 @@ class ARGS(object):
     # how many batches to wait before evaluating model
     val_every = 100
     # set flag to True if you wish to save the model after training
-    save_at_end = False
+    save_at_end = True
     # set this to value >0 if you wish to save every x epochs
-    save_freq=-1
+    save_freq=1
     # set true if using GPU during training
     use_cuda = True
     # image size
@@ -132,6 +132,7 @@ def eval_dataset_map(model, device, test_loader):
     gt = None
     pred = None
     valid = None
+    model.eval()
     with torch.no_grad():
         i = 0
         for data, target, wgt in test_loader:
@@ -153,4 +154,5 @@ def eval_dataset_map(model, device, test_loader):
             
     AP = compute_ap(gt, pred, valid)
     mAP = np.mean(AP)
+    model.train()
     return AP, mAP
